@@ -1,0 +1,29 @@
+services:
+  web:
+    build: .
+    container_name: cloud-capstone-web
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: capstone
+      DATABASE_USER: capstone
+      DATABASE_PASSWORD: capstonepassword
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    container_name: cloud-capstone-db
+    environment:
+      POSTGRES_DB: capstone
+      POSTGRES_USER: capstone
+      POSTGRES_PASSWORD: capstonepassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
