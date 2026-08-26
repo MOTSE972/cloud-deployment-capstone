@@ -10,3 +10,6 @@ __pycache__/
 .terraform/
 *.tfstate
 *.tfstate.*
+
+github-actions-policy.json
+github-actions-trust-policy.json

@@ -1,6 +1,6 @@
-services:
+ services:
   web:
-    build: .
+    image: 985682977715.dkr.ecr.us-east-1.amazonaws.com/cloud-capstone:latest
     container_name: cloud-capstone-web
     ports:
       - "5000:5000"
