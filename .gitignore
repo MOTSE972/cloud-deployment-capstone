@@ -1,24 +1,20 @@
-.venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.env
-*.log
-.vscode/
-.idea/
 # Terraform
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfvars
+*.tfvars.json
 
-github-actions-policy.json
-github-actions-trust-policy.json
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
-# GitHub Actions OIDC deployment
+# Environment / secrets
+.env
+.env.*
+!.env.example
 
-# GitHub Actions OIDC deployment
-
-# GitHub Actions OIDC deployment
-
-# OIDC trust policy updated
-# Test ECR permissions
+# Docker
+*.log
