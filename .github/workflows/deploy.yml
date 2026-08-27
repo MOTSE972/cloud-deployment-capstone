@@ -13,87 +13,6 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: cloud-capstone
   EC2_INSTANCE_ID: i-0bf53b4a0a340c4c4
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::985682977715:role/GitHubActions-Capstone-Role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Push Docker image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Deploy application to EC2
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$EC2_INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands="[
-              \"cd /home/ssm-user/cloud-deployment-capstone\",
-              \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
-              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest\",
-              \"sudo docker-compose down\",
-              \"sudo docker-compose up -d\"
-            ]" \
-            --query "Command.CommandId" \
-            --output text)
-
-          echo "SSM Command ID: $COMMAND_ID"
-
-          for i in {1..30}; do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$EC2_INSTANCE_ID" \
-              --query "Status" \
-              --output text)
-
-            echo "Deployment status: $STATUS"
-
-            if [ "$STATUS" = "Success" ]; then
-              exit 0
-            fi
-
- name: Cloud Capstone CI/CD
-
-on:
-  push:
-    branches:
-      - main
-
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: cloud-capstone
-  EC2_INSTANCE_ID: i-0bf53b4a0a340c4c4
-  CONTAINER_NAME: cloud-capstone-web
   APP_PORT: 5000
 
 jobs:
@@ -101,7 +20,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout source code
         uses: actions/checkout@v4
 
@@ -120,21 +38,18 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" .
 
           docker tag \
-            $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
+            "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
       - name: Push Docker image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
-
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
       - name: Deploy application to EC2
         env:
@@ -153,10 +68,9 @@ jobs:
             --query "Command.CommandId" \
             --output text)
 
-          echo "SSM Command ID: $COMMAND_ID"
+          echo "Deployment SSM Command ID: $COMMAND_ID"
 
           for i in {1..30}; do
-
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$EC2_INSTANCE_ID" \
@@ -173,7 +87,6 @@ jobs:
             if [ "$STATUS" = "Failed" ] || \
                [ "$STATUS" = "Cancelled" ] || \
                [ "$STATUS" = "TimedOut" ]; then
-
               echo "Deployment failed."
 
               aws ssm get-command-invocation \
@@ -197,108 +110,38 @@ jobs:
           echo "Waiting for application to start..."
           sleep 15
 
-      - name: Verify application health
-        run: |
-          echo "Checking application health..."
-
-          RESPONSE=$(curl --silent --show-error \
-            --fail \
-            --max-time 10 \
-            http://100.58.217.178:5000/health)
-
-          echo "Health response:"
-          echo "$RESPONSE"
-
-          echo "$RESPONSE" | grep -q '"status": "healthy"'
-name: Cloud Capstone CI/CD
-
-on:
-  push:
-    branches:
-      - main
-
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: cloud-capstone
-  EC2_INSTANCE_ID: i-0bf53b4a0a340c4c4
-  CONTAINER_NAME: cloud-capstone-web
-  APP_PORT: 5000
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::985682977715:role/GitHubActions-Capstone-Role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
-
-          docker tag \
-            $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Push Docker image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
-
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Deploy application to EC2
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      - name: Verify application health through SSM
         run: |
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands="[
-              \"cd /home/ssm-user/cloud-deployment-capstone\",
-              \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
-              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest\",
-              \"sudo docker-compose down\",
-              \"sudo docker-compose up -d\"
-            ]" \
+            --parameters commands="[\"curl --fail --silent --show-error --max-time 10 http://localhost:$APP_PORT/health\"]" \
             --query "Command.CommandId" \
             --output text)
 
-          echo "SSM Command ID: $COMMAND_ID"
+          echo "Health check SSM Command ID: $COMMAND_ID"
 
-          for i in {1..30}; do
-
+          for i in {1..12}; do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$EC2_INSTANCE_ID" \
               --query "Status" \
               --output text)
 
-            echo "Deployment status: $STATUS"
+            echo "Health check status: $STATUS"
 
             if [ "$STATUS" = "Success" ]; then
-              echo "EC2 deployment completed successfully."
+              OUTPUT=$(aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$EC2_INSTANCE_ID" \
+                --query "StandardOutputContent" \
+                --output text)
+
+              echo "Health response:"
+              echo "$OUTPUT"
+
+              echo "$OUTPUT" | grep -q '"status": "healthy"'
+              echo "Application health check passed."
               break
             fi
 
@@ -306,7 +149,7 @@ jobs:
                [ "$STATUS" = "Cancelled" ] || \
                [ "$STATUS" = "TimedOut" ]; then
 
-              echo "Deployment failed."
+              echo "Application health check failed."
 
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
@@ -315,123 +158,41 @@ jobs:
               exit 1
             fi
 
-            sleep 10
+            sleep 5
           done
 
-      - name: Verify ECR image
-        run: |
-          aws ecr describe-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --region "$AWS_REGION"
-
-      - name: Wait for application startup
-        run: |
-          echo "Waiting for application to start..."
-          sleep 15
-
-      - name: Verify application health
-        run: |
-          echo "Checking application health..."
-
-          RESPONSE=$(curl --silent --show-error \
-            --fail \
-            --max-time 10 \
-            http://100.58.217.178:5000/health)
-
-          echo "Health response:"
-          echo "$RESPONSE"
-
-          echo "$RESPONSE" | grep -q '"status": "healthy"'
-
- name: Cloud Capstone CI/CD
-
-on:
-  push:
-    branches:
-      - main
-
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: cloud-capstone
-  EC2_INSTANCE_ID: i-0bf53b4a0a340c4c4
-  CONTAINER_NAME: cloud-capstone-web
-  APP_PORT: 5000
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::985682977715:role/GitHubActions-Capstone-Role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
-
-          docker tag \
-            $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Push Docker image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
-
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Deploy application to EC2
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      - name: Verify database connection through SSM
         run: |
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands="[
-              \"cd /home/ssm-user/cloud-deployment-capstone\",
-              \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
-              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest\",
-              \"sudo docker-compose down\",
-              \"sudo docker-compose up -d\"
-            ]" \
+            --parameters commands="[\"curl --fail --silent --show-error --max-time 10 http://localhost:$APP_PORT/database\"]" \
             --query "Command.CommandId" \
             --output text)
 
-          echo "SSM Command ID: $COMMAND_ID"
+          echo "Database check SSM Command ID: $COMMAND_ID"
 
-          for i in {1..30}; do
-
+          for i in {1..12}; do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$EC2_INSTANCE_ID" \
               --query "Status" \
               --output text)
 
-            echo "Deployment status: $STATUS"
+            echo "Database check status: $STATUS"
 
             if [ "$STATUS" = "Success" ]; then
-              echo "EC2 deployment completed successfully."
+              OUTPUT=$(aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$EC2_INSTANCE_ID" \
+                --query "StandardOutputContent" \
+                --output text)
+
+              echo "Database response:"
+              echo "$OUTPUT"
+
+              echo "$OUTPUT" | grep -q '"status": "connected"'
+              echo "Database connection check passed."
               break
             fi
 
@@ -439,7 +200,7 @@ jobs:
                [ "$STATUS" = "Cancelled" ] || \
                [ "$STATUS" = "TimedOut" ]; then
 
-              echo "Deployment failed."
+              echo "Database connection check failed."
 
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
@@ -448,68 +209,14 @@ jobs:
               exit 1
             fi
 
-            sleep 10
+            sleep 5
           done
-
-      - name: Verify ECR image
-        run: |
-          aws ecr describe-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --region "$AWS_REGION"
-
-      - name: Get EC2 public IP
-        run: |
-          EC2_PUBLIC_IP=$(aws ec2 describe-instances \
-            --instance-ids "$EC2_INSTANCE_ID" \
-            --query "Reservations[0].Instances[0].PublicIpAddress" \
-            --output text)
-
-          echo "EC2_PUBLIC_IP=$EC2_PUBLIC_IP" >> "$GITHUB_ENV"
-
-          echo "EC2 Public IP: $EC2_PUBLIC_IP"
-
-      - name: Wait for application startup
-        run: |
-          echo "Waiting for application to start..."
-          sleep 15
-
-      - name: Verify application health
-        run: |
-          echo "Checking application health..."
-
-          RESPONSE=$(curl --silent --show-error \
-            --fail \
-            --max-time 10 \
-            "http://$EC2_PUBLIC_IP:$APP_PORT/health")
-
-          echo "Health response:"
-          echo "$RESPONSE"
-
-          echo "$RESPONSE" | grep -q '"status": "healthy"'
-
-          echo "Application health check passed."
-
-      - name: Verify database connection
-        run: |
-          echo "Checking database connection..."
-
-          RESPONSE=$(curl --silent --show-error \
-            --fail \
-            --max-time 10 \
-            "http://$EC2_PUBLIC_IP:$APP_PORT/database")
-
-          echo "Database response:"
-          echo "$RESPONSE"
-
-          echo "$RESPONSE" | grep -q '"status": "connected"'
-
-          echo "Database connection check passed."
 
       - name: Deployment complete
         run: |
           echo "=========================================="
           echo "Cloud Capstone deployment completed."
+          echo "Docker deployment: SUCCESS"
           echo "Application health: HEALTHY"
           echo "Database connection: CONNECTED"
-          echo "Docker deployment: SUCCESS"
-          echo "=========================================="        
+          echo "=========================================="
