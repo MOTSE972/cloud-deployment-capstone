@@ -21,3 +21,4 @@ github-actions-trust-policy.json
 # GitHub Actions OIDC deployment
 
 # OIDC trust policy updated
+# Test ECR permissions
